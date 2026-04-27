@@ -11,3 +11,8 @@ implementation plan. See the master plan for the target architecture, phased
 delivery order, security gates, tenant model, and module backlog:
 
 - [CMG Nexus Master Platform Plan](docs/cmg-nexus-master-platform-plan.md)
+
+Environment setup:
+
+- Copy `.env.example` to `.env` on the server and fill real values there.
+- See [Environment Setup](docs/environment-setup.md).
