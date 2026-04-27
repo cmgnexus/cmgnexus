@@ -3,8 +3,11 @@
 Date: 2026-04-27
 
 CMG Nexus is the central AI-led enterprise operating system for CMG. It is not
-just a CRM and must not become a thin wrapper around another product. Pepperi,
-Zoho, Xero, Google Maps, email providers, and fleet tools can inform or
+just a CRM and must not become a thin wrapper around another product. The system
+will be built from scratch with PHP and MySQL as the first production stack, with
+an API-first structure so it can later support a mobile app.
+
+Pepperi, Zoho, Xero, Google Maps, email providers, and fleet tools can inform or
 integrate with selected workflows, but CMG Nexus remains the owned operational
 control layer.
 
@@ -49,37 +52,77 @@ Rationale:
 - Zoho is broad, but still requires heavy configuration and custom workflows.
 - CMG needs a business-specific operating system rather than a generic CRM.
 
-## 3. Current State
+## 3. Build Baseline
 
-The live implementation described by the platform brief exists in a separate
-parallel environment:
+CMG Nexus is a new build. Do not treat any previous CRM, prototype, copied
+database, route, diagnostic page, or partial module as completed work.
 
-- Original CRM path: `/crm`
-- Nexus path: `/nexus`
-- Nexus database: separate cloned database
-- Existing CRM data copied into the Nexus database
-- `/nexus` runs independently from `/crm`
+Baseline decisions:
 
-Existing foundations described by the brief:
+- Build from zero using PHP and MySQL.
+- Design the first version as a secure web application.
+- Keep the backend API-first so a mobile app can be added later without
+  rewriting business logic.
+- Use server-rendered admin and operations screens where they are faster to ship,
+  but keep business actions behind clear service/API boundaries.
+- Model tenancy, permissions, audit, events, and operational queues from the
+  beginning instead of adding them after the CRM is built.
+- Treat external services as integrations, not as the system of record.
 
-- Customers, users, roles, invitations, sales reps, and zones
-- Tasks, notes, reports, search, audit logs, and Command Center
-- Items, warehouse inventory, suppliers, orders, and order lines
-- Invoices, payments, credit notes, aged receivables, approval queue, and price
-  rules
-- Routes, route stops, and live location foundations
-- Xero/accounting sync foundations
-- AI assistant chat and learning memory
-- Notification queue
+Initial technical foundations to create:
 
-Security status:
+- PHP application structure
+- MySQL schema and migrations
+- Environment configuration and secret handling
+- Authentication and session handling
+- Role and permission framework
+- Organization/tenant model
+- Audit logging
+- Queue-ready background job structure
+- File/document upload storage boundary
+- API routes for future app access
+- Basic admin UI layout
+- Automated database backup and restore procedure
 
-- `/nexus/diag-aging/` was public and has been disabled with `403`.
-- Remaining security work includes rotating exposed credentials and API keys,
-  locking down FTP and database access, and confirming no other diagnostic
-  endpoints or logs are public.
+Security baseline:
 
-## 4. Platform Owner Model
+- No public diagnostic endpoints.
+- No committed credentials, tokens, database passwords, FTP credentials, or API
+  keys.
+- Locked-down database and file access.
+- Centralized error handling that does not expose sensitive details.
+- Audit logs for sensitive user, tenant, role, and platform actions.
+- Owner/admin accounts prepared for future two-factor authentication.
+
+## 4. Technical Direction
+
+CMG Nexus will be built from zero as a PHP and MySQL platform.
+
+Primary technical direction:
+
+- Backend: PHP.
+- Database: MySQL.
+- First interface: responsive web platform for desktop and mobile browsers.
+- Future interface: mobile app built on top of the same platform API.
+- Architecture style: API-first so operational workflows, dashboards, and the
+  later mobile app use consistent business rules.
+- Data model: tenant-aware from the first migration, not added later as a patch.
+- AI integration: service layer that can classify, summarize, score risk, draft
+  actions, and create operational events without owning the source of truth.
+- External integrations: optional connectors for accounting, maps, email, OCR,
+  and fleet tools where they add value.
+
+Implementation principles:
+
+- Start with clean schemas, migrations, and seed data.
+- Keep business rules in server-side services, not scattered across templates.
+- Use role and tenant checks in every query path that touches business data.
+- Design endpoints so mobile app screens can be added without rewriting core
+  logic.
+- Keep audit logs for sensitive platform, tenant, finance, and user actions from
+  the beginning.
+
+## 5. Platform Owner Model
 
 The Platform Owner is a platform governance role, not a normal administrator.
 
@@ -94,13 +137,13 @@ Platform Owner responsibilities:
 - Access platform-level audit and governance.
 - Own critical platform settings and integrations.
 
-Current described access:
+Target access:
 
-- Login URL: `/nexus/owner-login`
-- Post-login console: `/nexus/platform`
+- Login URL: `/owner-login` or another dedicated platform-owner route.
+- Post-login console: `/platform`.
 - Role: `platform_owner`
 
-Current Platform Owner console includes:
+Initial Platform Owner console should include:
 
 - Tenant control
 - Platform user list
@@ -114,7 +157,7 @@ Required protections:
 - Critical owner/admin actions should eventually require re-authentication and
   two-factor authentication.
 
-## 5. Tenant and Organization Model
+## 6. Tenant and Organization Model
 
 CMG Nexus follows a Xero-style organization model:
 
@@ -124,28 +167,28 @@ CMG Nexus follows a Xero-style organization model:
 - Platform Owner can see across all organizations.
 - Organization Owner/Admin can manage only their organization.
 
-Existing tenant tables:
+Initial tenant tables to create:
 
 - `organizations`
 - `organization_memberships`
 
-Current described behavior:
+Target behavior:
 
-- Existing users were linked to a default organization.
+- Every user account is independent from organization membership.
 - Invitations belong to an organization.
-- User list shows organization membership.
-- User profile shows organization membership.
-- Header can show and switch the current organization.
+- User lists show organization membership and tenant-scoped roles.
+- User profiles show organization membership.
+- The header can show and switch the current organization when a user belongs to
+  more than one organization.
 
-Next step:
+Data-tenancy rule:
 
-- Move business data to a tenant-aware structure by adding `organization_id` to
-  important tables, backfilling current records, and filtering data by current
-  organization.
+- Business tables are created with `organization_id` from the first migration
+  unless they are explicitly platform-global tables.
 
-## 6. Target Architecture: Eight Engines
+## 7. Target Architecture: Eight Engines
 
-### 6.1 Identity and Permission Engine
+### 7.1 Identity and Permission Engine
 
 Controls platform owner, organization owner, admin, manager, department user, and
 external user access.
@@ -161,7 +204,7 @@ Needed capabilities:
 - Critical action re-authentication.
 - Two-factor authentication for owner/admin accounts.
 
-### 6.2 Operational Event Engine
+### 7.2 Operational Event Engine
 
 Everything important becomes an event.
 
@@ -194,7 +237,7 @@ Required event fields:
 - Related customer, order, invoice, supplier, or user
 - AI summary
 
-### 6.3 Work Queue and SLA Engine
+### 7.3 Work Queue and SLA Engine
 
 Turns operational events into action.
 
@@ -209,7 +252,7 @@ Needed capabilities:
 - Manager visibility
 - SLA breach tracking
 
-### 6.4 Document and Email Intelligence Engine
+### 7.4 Document and Email Intelligence Engine
 
 Reads incoming documents and emails, understands meaning, and creates actions.
 
@@ -240,7 +283,7 @@ Email categories:
 - Stock issue
 - Legal or urgent risk
 
-### 6.5 Commercial Execution Engine
+### 7.5 Commercial Execution Engine
 
 Makes sales reps professional and informed.
 
@@ -271,7 +314,7 @@ Sales representatives must know before each customer visit:
 - Promises made
 - Delivery problems
 
-### 6.6 Warehouse and Distribution Engine
+### 7.6 Warehouse and Distribution Engine
 
 Moves from inventory visibility to operational warehouse and delivery control.
 
@@ -308,7 +351,7 @@ Delivery principle:
 - If goods go out incomplete or wrong, the driver or distribution user records
   the exception at delivery time.
 
-### 6.7 Map and Fleet Movement Engine
+### 7.7 Map and Fleet Movement Engine
 
 Provides fleet-level visibility and accountability where useful.
 
@@ -330,7 +373,7 @@ Needed capabilities:
 The map must control movement, exceptions, and accountability, not only show
 pins.
 
-### 6.8 AI Insight and Reporting Engine
+### 7.8 AI Insight and Reporting Engine
 
 Continuously shows management what is missed.
 
@@ -358,7 +401,7 @@ Mobile experience:
 - Short text-first summaries
 - Action buttons
 
-## 7. Required Modules
+## 8. Required Modules
 
 ### Platform Layer
 
@@ -484,29 +527,27 @@ Mobile experience:
 - Route adherence
 - Stop proof
 
-## 8. Phase Plan
+## 9. Phase Plan
 
-### Phase 0: Stabilize and Secure
+### Phase 0: Foundation and Security Baseline
 
-Goal: make `/nexus` safe and reliable before heavy feature building.
+Goal: create the secure PHP/MySQL foundation before business modules are built.
 
 Tasks:
 
-- Rotate credentials and API keys.
-- Check all public diagnostic endpoints.
-- Restrict FTP and database access.
-- Confirm error logs are not public.
-- Verify database schema differences.
-- Fix known `orders.archived_at` issue if still present.
-- Confirm backup process.
-- Confirm `/crm` and `/nexus` are fully independent.
-
-Known status:
-
-- `/nexus` parallel environment exists.
-- `/nexus/diag-aging/` disabled.
-- Platform Owner role exists.
-- Platform Owner Console exists.
+- Create the PHP project structure.
+- Create MySQL migration and seed workflow.
+- Add environment configuration without committed secrets.
+- Implement authentication, sessions, password hashing, and logout.
+- Create the initial responsive web layout.
+- Add API route structure for future mobile app use.
+- Add centralized authorization middleware.
+- Add centralized error handling that hides sensitive details.
+- Add audit logging for sensitive actions.
+- Add backup and restore procedure for MySQL.
+- Confirm there are no public diagnostic endpoints from the beginning.
+- Document deployment, filesystem permissions, database access, and secret
+  rotation rules.
 
 ### Phase 1: Platform and Tenant Control
 
@@ -683,7 +724,7 @@ Tasks:
 - Mobile text summary
 - AI recommended next action
 
-## 9. Immediate Development Order
+## 10. Immediate Development Order
 
 1. Finish Platform Owner Console:
    - Tenant detail page
@@ -712,7 +753,7 @@ Tasks:
    - Risk by department
    - Owner, action, and deadline
 
-## 10. Definition of Success
+## 11. Definition of Success
 
 CMG Nexus is successful when:
 
@@ -728,7 +769,7 @@ CMG Nexus is successful when:
 - Desktop shows rich dashboards and charts.
 - Mobile shows short, text-first operational actions.
 
-## 11. Guiding Principle
+## 12. Guiding Principle
 
 Do not build a lazy system.
 
